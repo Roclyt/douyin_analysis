@@ -368,17 +368,20 @@ class Config:
 
 
 ### 主要模块图片
-![首页](%E9%A6%96%E9%A1%B5.JPG)
-![用户地区分析](%E7%94%A8%E6%88%B7%E5%9C%B0%E5%8C%BA%E7%BB%9F%E8%AE%A1.JPG)
-![词云图](%E8%AF%8D%E4%BA%91%E5%9B%BE%E7%94%9F%E6%88%90%E6%A8%A1%E5%9D%971.JPG)
-![情感分析](%E6%83%85%E6%84%9F%E5%88%86%E6%9E%90.JPG)
-![AI短视频分析](AI%E8%A7%86%E9%A2%91%E5%88%86%E6%9E%90%E5%92%8C%E5%BB%BA%E8%AE%AE.JPG)
-![点赞预测模块1](%E7%82%B9%E8%B5%9E%E9%A2%84%E6%B5%8B%E6%A8%A1%E5%9D%971.JPG)
-![点赞预测模块2](%E7%82%B9%E8%B5%9E%E9%A2%84%E6%B5%8B%E6%A8%A1%E5%9D%972.JPG)
-![粉丝数量模块1](%E7%B2%89%E4%B8%9D%E6%95%B0%E9%87%8F%E6%A8%A1%E5%9D%971.JPG)
-![粉丝数量模块2](%E7%B2%89%E4%B8%9D%E6%95%B0%E9%87%8F%E6%A8%A1%E5%9D%972.JPG)
-![评论分析模块1](%E8%AF%84%E8%AE%BA%E5%88%86%E6%9E%90%E6%A8%A1%E5%9D%97.JPG)
-![评论分析模块2](%E8%AF%84%E8%AE%BA%E5%88%86%E6%9E%90%E6%A8%A1%E5%9D%972.JPG)
+
+![AI视频分析和建议](https://github.com/user-attachments/assets/7b521ac4-defe-44f2-9e31-52d885674bbd)
+![词云图生成2](https://github.com/user-attachments/assets/4daecf66-6f0e-40d3-8df2-4a127e8062c1)
+![词云图生成模块1](https://github.com/user-attachments/assets/c2ee6171-84c5-4205-b875-e7c0eee4b9be)
+![点赞预测模块1](https://github.com/user-attachments/assets/68ddfffb-a3f5-4f40-8e9f-bc512b8f1bc6)
+![点赞预测模块2](https://github.com/user-attachments/assets/a239d1e8-78b6-4af4-93ae-5e32d2a3f58c)
+![短视频分析](https://github.com/user-attachments/assets/f91534bf-b600-4c4e-bd2c-e49031cf7f5b)
+![粉丝数量模块1](https://github.com/user-attachments/assets/67a5d197-fb80-4bcf-a7e4-f067ef90bfa3)
+![粉丝数量模块2](https://github.com/user-attachments/assets/eb040a43-7118-4422-8416-242a3916b5e5)
+![评论分析模块](https://github.com/user-attachments/assets/e83087d3-34d3-4030-9f83-af1605b622d5)
+![评论分析模块2](https://github.com/user-attachments/assets/6a03b2bf-ff7a-4d6f-a0ce-b7f62ed34216)
+![情感分析](https://github.com/user-attachments/assets/500c1d3d-1905-4ab7-9167-67b7435d0916)
+![首页](https://github.com/user-attachments/assets/f571d6c8-8b41-4f6f-809e-42bd6fc25b58)
+![用户地区统计](https://github.com/user-attachments/assets/c4fdac7b-c13f-4472-af4b-d108ef153e83)
 
 
 ## 🤝 贡献指南
