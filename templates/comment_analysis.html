@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}评论分析 - 抖音数据分析系统{% endblock %}
+
+{% block page_title %}评论分析{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>评论数据分析</h2>
+    <p>分析视频的评论数、分享数等互动数据</p>
+</div>
+
+<!-- 统计卡片 -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">总评论数</div>
+        <div class="stat-value" id="total-comments">-</div>
+        <div class="stat-change">所有视频评论总数</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">总分享数</div>
+        <div class="stat-value" id="total-shares">-</div>
+        <div class="stat-change">所有视频分享总数</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">平均评论数</div>
+        <div class="stat-value" id="avg-comments">-</div>
+        <div class="stat-change">每视频平均评论数</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">平均分享数</div>
+        <div class="stat-value" id="avg-shares">-</div>
+        <div class="stat-change">每视频平均分享数</div>
+    </div>
+</div>
+
+<!-- 评论数与分享数对比图 -->
+<div class="card">
+    <div class="card-title">热门视频评论数与分享数对比（TOP 10）</div>
+    <div id="comment-share-chart" class="chart-container"></div>
+</div>
+
+<!-- 视频详细数据 -->
+<div class="card">
+    <div class="card-title">视频互动详细数据</div>
+    <div class="table-container">
+        <table id="videos-table">
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>视频ID</th>
+                    <th>描述</th>
+                    <th>点赞数</th>
+                    <th>评论数</th>
+                    <th>分享数</th>
+                    <th>收藏数</th>
+                    <th>互动率</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="8" class="loading">加载中...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 加载视频数据
+    async function loadVideoData() {
+        try {
+            const response = await fetch('/api/top-videos/?limit=10');
+            const data = await response.json();
+
+            if (data.success) {
+                const videos = data.data;
+
+                // 计算统计数据
+                const totalComments = videos.reduce((sum, v) => sum + v.comment_count, 0);
+                const totalShares = videos.reduce((sum, v) => sum + v.share_count, 0);
+                const avgComments = Math.round(totalComments / videos.length);
+                const avgShares = Math.round(totalShares / videos.length);
+
+                document.getElementById('total-comments').textContent = totalComments.toLocaleString();
+                document.getElementById('total-shares').textContent = totalShares.toLocaleString();
+                document.getElementById('avg-comments').textContent = avgComments.toLocaleString();
+                document.getElementById('avg-shares').textContent = avgShares.toLocaleString();
+
+                // 绘制评论数与分享数对比图
+                const chart = echarts.init(document.getElementById('comment-share-chart'));
+                const descriptions = videos.map(v => v.description.substring(0, 15) + '...');
+                const comment_counts = videos.map(v => v.comment_count);
+                const share_counts = videos.map(v => v.share_count);
+
+                const option = {
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: {
+                            type: 'shadow'
+                        }
+                    },
+                    legend: {
+                        data: ['评论数', '分享数']
+                    },
+                    grid: {
+                        left: '3%',
+                        right: '4%',
+                        bottom: '3%',
+                        containLabel: true
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: descriptions,
+                        axisLabel: {
+                            rotate: 45,
+                            interval: 0
+                        }
+                    },
+                    yAxis: {
+                        type: 'value'
+                    },
+                    series: [
+                        {
+                            name: '评论数',
+                            type: 'bar',
+                            data: comment_counts,
+                            itemStyle: {
+                                color: '#667eea'
+                            }
+                        },
+                        {
+                            name: '分享数',
+                            type: 'bar',
+                            data: share_counts,
+                            itemStyle: {
+                                color: '#764ba2'
+                            }
+                        }
+                    ]
+                };
+                chart.setOption(option);
+
+                // 更新表格
+                const tbody = document.querySelector('#videos-table tbody');
+                tbody.innerHTML = '';
+
+                videos.forEach((video, index) => {
+                    const engagementRate = ((video.comment_count + video.share_count + video.collect_count) / (video.like_count || 1) * 100).toFixed(2);
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${video.aweme_id}</td>
+                        <td>${video.description.substring(0, 30)}...</td>
+                        <td>${video.like_count.toLocaleString()}</td>
+                        <td>${video.comment_count.toLocaleString()}</td>
+                        <td>${video.share_count.toLocaleString()}</td>
+                        <td>${video.collect_count.toLocaleString()}</td>
+                        <td>${engagementRate}%</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        } catch (error) {
+            console.error('加载视频数据失败:', error);
+        }
+    }
+
+    // 初始化
+    loadVideoData();
+
+    // 响应式图表
+    window.addEventListener('resize', function() {
+        const chart = echarts.getInstanceByDom(document.getElementById('comment-share-chart'));
+        if (chart) chart.resize();
+    });
+</script>
+{% endblock %}

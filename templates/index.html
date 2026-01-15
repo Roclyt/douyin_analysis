@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - 抖音数据分析系统{% endblock %}
+
+{% block page_title %}首页{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>数据概览</h2>
+    <p>查看抖音视频和评论的总体统计数据</p>
+</div>
+
+<!-- 统计卡片 -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">视频总数</div>
+        <div class="stat-value" id="total-videos">-</div>
+        <div class="stat-change">已收录视频数量</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">评论总数</div>
+        <div class="stat-value" id="total-comments">-</div>
+        <div class="stat-change">已收录评论数量</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">用户总数</div>
+        <div class="stat-value" id="total-users">-</div>
+        <div class="stat-change">参与用户数量</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">平均点赞数</div>
+        <div class="stat-value" id="avg-likes">-</div>
+        <div class="stat-change">视频平均点赞数</div>
+    </div>
+</div>
+
+<!-- 图表区域 -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 20px; margin-bottom: 24px;">
+    <div class="card">
+        <div class="card-title">粉丝数量分布</div>
+        <div id="fans-chart" class="chart-container"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">点赞收藏关系</div>
+        <div id="like-chart" class="chart-container"></div>
+    </div>
+</div>
+
+<!-- 热门视频 -->
+<div class="card">
+    <div class="card-title">热门视频 TOP 10</div>
+    <div class="table-container">
+        <table id="top-videos-table">
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>视频ID</th>
+                    <th>描述</th>
+                    <th>点赞数</th>
+                    <th>评论数</th>
+                    <th>分享数</th>
+                    <th>收藏数</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="7" class="loading">加载中...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 快速操作 -->
+<div class="card">
+    <div class="card-title">快速操作</div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button class="btn btn-primary" onclick="window.location.href='/video-comments/'">查看视频评论</button>
+        <button class="btn btn-primary" onclick="window.location.href='/user-region/'">用户地区分析</button>
+        <button class="btn btn-primary" onclick="window.location.href='/fans-analysis/'">粉丝数量分析</button>
+        <button class="btn btn-primary" onclick="window.location.href='/sentiment-analysis/'">情感分析</button>
+        <button class="btn btn-primary" onclick="window.location.href='/comment-wordcloud/'">评论词云</button>
+    </div>
+</div>
+
+<script>
+    // 加载总体统计
+    async function loadGeneralStats() {
+        try {
+            const response = await fetch('/api/general-stats/');
+            const data = await response.json();
+
+            if (data.success) {
+                document.getElementById('total-videos').textContent = data.data.total_videos;
+                document.getElementById('total-comments').textContent = data.data.total_comments;
+            }
+        } catch (error) {
+            console.error('加载统计失败:', error);
+        }
+    }
+
+    // 加载粉丝分布
+    async function loadFansDistribution() {
+        try {
+            const response = await fetch('/api/fans-distribution/');
+            const data = await response.json();
+
+            if (data.success) {
+                const chart = echarts.init(document.getElementById('fans-chart'));
+                const option = {
+                    tooltip: {
+                        trigger: 'item'
+                    },
+                    legend: {
+                        orient: 'vertical',
+                        left: 'left'
+                    },
+                    series: [
+                        {
+                            type: 'pie',
+                            radius: ['40%', '70%'],
+                            avoidLabelOverlap: false,
+                            itemStyle: {
+                                borderRadius: 10,
+                                borderColor: '#fff',
+                                borderWidth: 2
+                            },
+                            label: {
+                                show: false,
+                                position: 'center'
+                            },
+                            emphasis: {
+                                label: {
+                                    show: true,
+                                    fontSize: 16,
+                                    fontWeight: 'bold'
+                                }
+                            },
+                            labelLine: {
+                                show: false
+                            },
+                            data: Object.keys(data.data).map(key => ({
+                                value: data.data[key],
+                                name: key
+                            }))
+                        }
+                    ]
+                };
+                chart.setOption(option);
+            }
+        } catch (error) {
+            console.error('加载粉丝分布失败:', error);
+        }
+    }
+
+    // 加载点赞收藏关系
+    async function loadLikeCollectRelation() {
+        try {
+            const response = await fetch('/api/like-collect-relation/');
+            const data = await response.json();
+
+            if (data.success && data.data.data && data.data.data.length > 0) {
+                const chart = echarts.init(document.getElementById('like-chart'));
+                const videos = data.data.data.slice(0, 10);
+                const descriptions = videos.map(v => v.description.substring(0, 15) + '...');
+                const likes = videos.map(v => v.like_count);
+                const collects = videos.map(v => v.collect_count);
+
+                const option = {
+                    tooltip: {
+                        trigger: 'axis'
+                    },
+                    legend: {
+                        data: ['点赞数', '收藏数']
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: descriptions,
+                        axisLabel: {
+                            rotate: 45,
+                            interval: 0
+                        }
+                    },
+                    yAxis: {
+                        type: 'value'
+                    },
+                    series: [
+                        {
+                            name: '点赞数',
+                            type: 'bar',
+                            data: likes,
+                            itemStyle: {
+                                color: '#667eea'
+                            }
+                        },
+                        {
+                            name: '收藏数',
+                            type: 'bar',
+                            data: collects,
+                            itemStyle: {
+                                color: '#764ba2'
+                            }
+                        }
+                    ]
+                };
+                chart.setOption(option);
+
+                // 计算平均点赞数
+                const avgLikes = Math.round(likes.reduce((a, b) => a + b, 0) / likes.length);
+                document.getElementById('avg-likes').textContent = avgLikes.toLocaleString();
+            }
+        } catch (error) {
+            console.error('加载点赞收藏关系失败:', error);
+        }
+    }
+
+    // 加载热门视频
+    async function loadTopVideos() {
+        try {
+            const response = await fetch('/api/top-videos/?limit=10');
+            const data = await response.json();
+
+            if (data.success) {
+                const tbody = document.querySelector('#top-videos-table tbody');
+                tbody.innerHTML = '';
+
+                data.data.forEach((video, index) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${video.aweme_id}</td>
+                        <td>${video.description.substring(0, 30)}...</td>
+                        <td>${video.like_count.toLocaleString()}</td>
+                        <td>${video.comment_count.toLocaleString()}</td>
+                        <td>${video.share_count.toLocaleString()}</td>
+                        <td>${video.collect_count.toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('total-users').textContent = data.data.length;
+            }
+        } catch (error) {
+            console.error('加载热门视频失败:', error);
+        }
+    }
+
+    // 初始化
+    loadGeneralStats();
+    loadFansDistribution();
+    loadLikeCollectRelation();
+    loadTopVideos();
+
+    // 响应式图表
+    window.addEventListener('resize', function() {
+        const fansChart = echarts.getInstanceByDom(document.getElementById('fans-chart'));
+        const likeChart = echarts.getInstanceByDom(document.getElementById('like-chart'));
+        if (fansChart) fansChart.resize();
+        if (likeChart) likeChart.resize();
+    });
+</script>
+{% endblock %}

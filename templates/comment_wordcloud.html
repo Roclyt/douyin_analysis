@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}评论词云图 - 抖音数据分析系统{% endblock %}
+
+{% block page_title %}评论词云图{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>评论词云分析</h2>
+    <p>基于评论内容生成词云，展示热门关键词</p>
+</div>
+
+<!-- 筛选区域 -->
+<div class="card">
+    <div class="card-title">筛选条件</div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+        <label>选择视频：</label>
+        <select id="video-select" style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px; min-width: 300px;">
+            <option value="">全部评论</option>
+        </select>
+        <button class="btn btn-primary" onclick="generateWordcloud()">生成词云</button>
+        <button class="btn btn-secondary" onclick="generateAllWordcloud()">生成全部评论词云</button>
+    </div>
+</div>
+
+<!-- 词云显示区域 -->
+<div class="card">
+    <div class="card-title">词云图（爱心形状）</div>
+    <div id="wordcloud-container" style="width: 100%; height: 500px; display: flex; align-items: center; justify-content: center; background: #f9fafb; border-radius: 8px;">
+        <div style="text-align: center; color: #666;">
+            <div style="font-size: 48px; margin-bottom: 16px;">☁️</div>
+            <p>选择视频后点击"生成词云"按钮</p>
+        </div>
+    </div>
+</div>
+
+<!-- 关键词详细统计 -->
+<div class="card">
+    <div class="card-title">关键词详细统计</div>
+    <div class="table-container">
+        <table id="keywords-table">
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>关键词</th>
+                    <th>出现次数</th>
+                    <th>占比</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 40px; color: #666;">暂无数据</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 加载视频列表
+    async function loadVideoList() {
+        try {
+            const response = await fetch('/api/video-list/?limit=100');
+            const data = await response.json();
+
+            if (data.success && data.data.videos) {
+                const select = document.getElementById('video-select');
+                select.innerHTML = '<option value="">全部评论</option>';
+                data.data.videos.forEach(video => {
+                    const option = document.createElement('option');
+                    option.value = video.aweme_id;
+                    option.textContent = `${video.user_name} - ${video.description.substring(0, 30)}...`;
+                    select.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('加载视频列表失败:', error);
+        }
+    }
+
+    // 生成指定视频的词云
+    async function generateWordcloud() {
+        const videoId = document.getElementById('video-select').value;
+
+        try {
+            const response = await fetch(`/api/comment-wordcloud/?video_id=${videoId}`);
+            const data = await response.json();
+
+            if (data.success) {
+                displayWordcloud(data.data);
+            } else {
+                alert(data.error || '生成词云失败');
+            }
+        } catch (error) {
+            console.error('生成词云失败:', error);
+            alert('生成词云失败，请稍后重试');
+        }
+    }
+
+    // 生成全部评论的词云
+    async function generateAllWordcloud() {
+        try {
+            const response = await fetch('/api/comment-wordcloud/');
+            const data = await response.json();
+
+            if (data.success) {
+                displayWordcloud(data.data);
+                document.getElementById('video-select').value = '';  // 重置选择
+            } else {
+                alert(data.error || '生成词云失败');
+            }
+        } catch (error) {
+            console.error('生成词云失败:', error);
+            alert('生成词云失败，请稍后重试');
+        }
+    }
+
+    // 显示词云
+    function displayWordcloud(wordData) {
+        // 显示词云图片
+        const container = document.getElementById('wordcloud-container');
+        if (wordData.image) {
+            container.innerHTML = `
+                <img src="${wordData.image}"
+                     alt="爱心词云图"
+                     style="max-width: 100%; max-height: 100%; object-fit: contain;">
+            `;
+        } else {
+            container.innerHTML = `
+                <div style="text-align: center; color: #666;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">❓</div>
+                    <p>无法生成词云图</p>
+                </div>
+            `;
+        }
+
+        // 显示关键词详细统计
+        const tbody = document.querySelector('#keywords-table tbody');
+        tbody.innerHTML = '';
+
+        if (wordData.keywords && wordData.keywords.length > 0) {
+            const totalWords = wordData.keywords.reduce((sum, item) => sum + item.count, 0);
+
+            wordData.keywords.forEach((item, index) => {
+                const percentage = ((item.count / totalWords) * 100).toFixed(2);
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${item.word}</td>
+                    <td>${item.count}</td>
+                    <td>${percentage}%</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 40px; color: #666;">暂无数据</td>
+                </tr>
+            `;
+        }
+    }
+
+    // 初始化
+    loadVideoList();
+</script>
+{% endblock %}

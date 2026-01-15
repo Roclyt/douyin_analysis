@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI视频分析 - 抖音数据分析系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f7fa;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 40px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+        }
+
+        .header a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .header a:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .input-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .input-section h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            font-size: 14px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #667eea;
+            color: white;
+            margin-right: 10px;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .result-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .result-section.show {
+            display: block;
+        }
+
+        .result-section h2 {
+            margin-bottom: 20px;
+            color: #333;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .score-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .score-card .score {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .score-card .label {
+            font-size: 16px;
+        }
+
+        .analysis-card {
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .analysis-card h3 {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            margin: 0;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .analysis-card .content {
+            padding: 20px;
+        }
+
+        .analysis-card ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .analysis-card li {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .analysis-card li:last-child {
+            border-bottom: none;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-right: 8px;
+        }
+
+        .tag.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .tag.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .tag.danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AI视频分析</h1>
+        <a href="/">返回首页</a>
+    </div>
+
+    <div class="container">
+        <div class="input-section">
+            <h2>输入视频信息</h2>
+            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">请从下拉列表选择视频进行分析，系统将根据点赞数、评论数、分享数等指标评估视频表现并给出优化建议。</p>
+
+            <div class="input-group">
+                <label for="videoSelect">选择视频（从数据库）：</label>
+                <select id="videoSelect">
+                    <option value="">-- 请选择视频 --</option>
+                </select>
+            </div>
+
+            <button class="btn" onclick="analyzeByData()">开始分析</button>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="loading-spinner"></div>
+            <p>正在分析中，请稍候...</p>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <div id="resultSection" class="result-section">
+            <h2>分析结果</h2>
+
+            <div class="analysis-card">
+                <h3>表现评估</h3>
+                <div class="content" id="performanceAssessment"></div>
+            </div>
+
+            <div class="analysis-card">
+                <h3>优化建议</h3>
+                <div class="content" id="optimizationSuggestions"></div>
+            </div>
+
+            <div class="analysis-card">
+                <h3>数据指标</h3>
+                <div class="content" id="metrics"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时加载视频列表
+        window.onload = function() {
+            loadVideoList();
+        };
+
+        // 加载视频列表
+        function loadVideoList() {
+            fetch('/api/video-list/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data.videos) {
+                        const select = document.getElementById('videoSelect');
+                        data.data.videos.forEach(video => {
+                            const option = document.createElement('option');
+                            option.value = video.aweme_id;
+                            option.textContent = video.user_name + ' - ' + video.description.substring(0, 30);
+                            select.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // 显示加载状态
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('message').style.display = 'none';
+            document.getElementById('resultSection').classList.remove('show');
+        }
+
+        // 隐藏加载状态
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        // 显示消息
+        function showMessage(message, isError = false) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = 'message ' + (isError ? 'error' : 'success');
+            messageDiv.style.display = 'block';
+
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // 分析视频数据
+        function analyzeByData() {
+            const videoId = document.getElementById('videoSelect').value;
+
+            if (!videoId) {
+                showMessage('请选择视频', true);
+                return;
+            }
+
+            showLoading();
+
+            fetch('/api/analyze-video-data/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ video_id: videoId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    displayAnalysisResult(data.data);
+                } else {
+                    showMessage(data.error || data.message || '分析失败', true);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showMessage('请求失败：' + error, true);
+            });
+        }
+
+        // 显示分析结果
+        function displayAnalysisResult(data) {
+            document.getElementById('resultSection').classList.add('show');
+
+            // 表现评估
+            if (data.performance_assessment) {
+                const pa = data.performance_assessment;
+                document.getElementById('performanceAssessment').innerHTML = `
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="color: #667eea; margin-bottom: 10px;">整体表现</h4>
+                        <p>${pa.overall || '--'}</p>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="color: #667eea; margin-bottom: 10px;">互动表现</h4>
+                        <p>${pa.interaction_performance || '--'}</p>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <h4 style="color: #667eea; margin-bottom: 10px;">各指标表现</h4>
+                        <ul style="line-height: 2;">
+                            <li><strong>点赞：</strong>${pa.like_performance || '--'}</li>
+                            <li><strong>评论：</strong>${pa.comment_performance || '--'}</li>
+                            <li><strong>分享：</strong>${pa.share_performance || '--'}</li>
+                            <li><strong>收藏：</strong>${pa.collect_performance || '--'}</li>
+                        </ul>
+                    </div>
+                    ${pa.highlights && pa.highlights.length > 0 ? `
+                    <div>
+                        <h4 style="color: #667eea; margin-bottom: 10px;">亮点</h4>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            ${pa.highlights.map(h => `<span class="tag success">${h}</span>`).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+                `;
+            }
+
+            // 优化建议
+            if (data.optimization_suggestions) {
+                const os = data.optimization_suggestions;
+                document.getElementById('optimizationSuggestions').innerHTML = `
+                    <div style="margin-bottom: 25px;">
+                        <h4 style="color: #667eea; margin-bottom: 15px; font-size: 16px;">1. 内容方向建议</h4>
+                        ${os.content_direction && os.content_direction.length > 0 ? `
+                            <ul style="line-height: 2;">
+                                ${os.content_direction.map(item => `<li>${item}</li>`).join('')}
+                            </ul>
+                        ` : '<p>暂无建议</p>'}
+                    </div>
+                    <div style="margin-bottom: 25px;">
+                        <h4 style="color: #667eea; margin-bottom: 15px; font-size: 16px;">2. 互动设计方向</h4>
+                        ${os.interaction_design && os.interaction_design.length > 0 ? `
+                            <ul style="line-height: 2;">
+                                ${os.interaction_design.map(item => `<li>${item}</li>`).join('')}
+                            </ul>
+                        ` : '<p>暂无建议</p>'}
+                    </div>
+                    <div>
+                        <h4 style="color: #667eea; margin-bottom: 15px; font-size: 16px;">3. 标签/话题优化</h4>
+                        ${os.hashtag_optimization && os.hashtag_optimization.length > 0 ? `
+                            <ul style="line-height: 2;">
+                                ${os.hashtag_optimization.map(item => `<li>${item}</li>`).join('')}
+                            </ul>
+                        ` : '<p>暂无建议</p>'}
+                    </div>
+                `;
+            }
+
+            // 数据指标
+            if (data.metrics) {
+                document.getElementById('metrics').innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: #667eea;">${data.metrics.view_count || 0}</div>
+                            <div style="font-size: 12px; color: #666; margin-top: 5px;">播放数</div>
+                        </div>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: #ff6b6b;">${data.metrics.like_count || 0}</div>
+                            <div style="font-size: 12px; color: #666; margin-top: 5px;">点赞数</div>
+                        </div>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: #4ecdc4;">${data.metrics.comment_count || 0}</div>
+                            <div style="font-size: 12px; color: #666; margin-top: 5px;">评论数</div>
+                        </div>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: #95e1d3;">${data.metrics.share_count || 0}</div>
+                            <div style="font-size: 12px; color: #666; margin-top: 5px;">分享数</div>
+                        </div>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: #ffd93d;">${data.metrics.collect_count || 0}</div>
+                            <div style="font-size: 12px; color: #666; margin-top: 5px;">收藏数</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 8px; text-align: center; color: white;">
+                            <div style="font-size: 24px; font-weight: bold;">${data.metrics.interaction_rate || 0}%</div>
+                            <div style="font-size: 12px; margin-top: 5px;">互动率</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

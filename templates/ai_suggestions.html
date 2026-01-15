@@ -1,0 +1,622 @@
+{% extends 'base.html' %}
+
+{% block title %}AI分析与建议 - 抖音数据分析系统{% endblock %}
+
+{% block page_title %}短视频AI分析与建议{% endblock %}
+
+{% block extra_css %}
+<style>
+    .ai-section {
+        margin-bottom: 32px;
+    }
+
+    .chat-container {
+        max-height: 500px;
+        overflow-y: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        background: #fafafa;
+        margin-bottom: 20px;
+    }
+
+    .chat-message {
+        margin-bottom: 16px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        max-width: 80%;
+        line-height: 1.6;
+    }
+
+    .chat-message.user {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        margin-left: auto;
+    }
+
+    .chat-message.ai {
+        background: white;
+        color: #333;
+        border: 1px solid #e5e7eb;
+    }
+
+    .chat-input-container {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+    }
+
+    .chat-textarea {
+        flex: 1;
+        min-height: 80px;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 14px;
+        resize: vertical;
+    }
+
+    .chat-textarea:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .video-selector-container {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .video-selector {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    .typing-indicator {
+        display: inline-flex;
+        gap: 4px;
+    }
+
+    .typing-indicator span {
+        width: 8px;
+        height: 8px;
+        background: #667eea;
+        border-radius: 50%;
+        animation: typing 1.4s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .typing-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+        0%, 60%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-10px); }
+    }
+
+    .suggestion-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .suggestion-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .suggestion-card:hover {
+        border-color: #667eea;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .suggestion-icon {
+        font-size: 32px;
+        margin-bottom: 12px;
+    }
+
+    .suggestion-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 8px;
+    }
+
+    .suggestion-desc {
+        font-size: 14px;
+        color: #666;
+        line-height: 1.6;
+    }
+
+    .analysis-result {
+        background: #f0fdf4;
+        border: 1px solid #86efac;
+        border-radius: 8px;
+        padding: 16px;
+        margin-top: 16px;
+    }
+
+    .analysis-result.error {
+        background: #fef2f2;
+        border-color: #fca5a5;
+    }
+
+    .analysis-result h4 {
+        color: #166534;
+        margin-bottom: 12px;
+        font-size: 16px;
+    }
+
+    .analysis-result.error h4 {
+        color: #dc2626;
+    }
+
+    .analysis-content {
+        color: #374151;
+        line-height: 1.8;
+        white-space: pre-wrap;
+    }
+
+    .model-info {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 20px;
+    }
+
+    .model-info p {
+        margin: 4px 0;
+        color: #1e40af;
+        font-size: 13px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>短视频AI分析与建议</h2>
+    <p>使用豆包1.6深度思考模型进行智能分析</p>
+</div>
+
+<div class="model-info">
+    <p><strong>当前模型：</strong>doubao-seed-1-6-thinking-250715 (深度思考模型)</p>
+    <p><strong>模型特点：</strong>具备深度推理能力，适合复杂任务的分析与建议</p>
+    <p><strong>思考模式：</strong>已启用，模型会进行深度思考后给出专业建议</p>
+</div>
+
+<div class="suggestion-cards">
+    <div class="suggestion-card" onclick="useSuggestion('content')">
+        <div class="suggestion-icon">📝</div>
+        <div class="suggestion-title">内容优化建议</div>
+        <div class="suggestion-desc">根据视频数据分析内容表现，提供优化建议</div>
+    </div>
+
+    <div class="suggestion-card" onclick="useSuggestion('trending')">
+        <div class="suggestion-icon">🔥</div>
+        <div class="suggestion-title">热门趋势分析</div>
+        <div class="suggestion-desc">分析当前热门视频的特点和趋势</div>
+    </div>
+
+    <div class="suggestion-card" onclick="useSuggestion('engagement')">
+        <div class="suggestion-icon">📊</div>
+        <div class="suggestion-title">互动率提升</div>
+        <div class="suggestion-desc">提供提升用户互动率的策略建议</div>
+    </div>
+
+    <div class="suggestion-card" onclick="useSuggestion('schedule')">
+        <div class="suggestion-icon">⏰</div>
+        <div class="suggestion-title">最佳发布时间</div>
+        <div class="suggestion-desc">分析最佳发布时间段</div>
+    </div>
+</div>
+
+<div class="card ai-section">
+    <h3 class="card-title">选择视频进行AI分析</h3>
+    <div class="video-selector-container">
+        <select id="ai-video-select" class="video-selector">
+            <option value="">请选择视频</option>
+        </select>
+        <button class="btn btn-primary" onclick="analyzeVideo()">深度分析</button>
+    </div>
+
+    <div id="ai-analysis-result" style="display: none;"></div>
+</div>
+
+<div class="card ai-section">
+    <h3 class="card-title">AI智能对话</h3>
+    <p style="color: #666; margin-bottom: 16px; font-size: 14px;">
+        与AI助手进行对话，获取个性化的内容建议、数据分析洞察等。
+    </p>
+
+    <div id="chat-container" class="chat-container">
+        <div class="chat-message ai">
+            你好！我是抖音数据分析AI助手。我可以帮助你分析视频表现、提供内容优化建议、分析热门趋势等。请选择一个视频进行分析，或者直接向我提问！
+        </div>
+    </div>
+
+    <div class="chat-input-container">
+        <textarea
+            id="chat-input"
+            class="chat-textarea"
+            placeholder="输入你的问题或需要分析的内容..."
+            onkeydown="if(event.key === 'Enter' && !event.shiftKey){event.preventDefault();sendMessage();}"
+        ></textarea>
+        <button class="btn btn-primary" onclick="sendMessage()" id="send-btn">发送</button>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">功能说明</h3>
+    <div style="color: #666; line-height: 1.8;">
+        <p><strong>1. 深度分析功能：</strong>选择视频后，AI会基于视频的各项数据（点赞、评论、收藏、分享等）进行深度分析，提供详细的内容建议。</p>
+        <p><strong>2. 智能对话：</strong>可以随时与AI助手对话，询问关于抖音运营、内容创作、数据分析等任何问题。</p>
+        <p><strong>3. 模型优势：</strong>豆包1.6深度思考模型具备强大的推理能力，能够结合多个维度给出专业的分析和建议。</p>
+        <p><strong>4. 使用建议：</strong>为了获得更好的分析结果，建议先选择一个视频进行深度分析，然后再进行对话交流。</p>
+    </div>
+</div>
+
+<script>
+    let chatHistory = [];
+
+    // 加载视频列表
+    function loadVideoList() {
+        fetch('/api/video-list/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const select = document.getElementById('ai-video-select');
+                    select.innerHTML = '<option value="">请选择视频</option>';
+                    data.data.videos.forEach(video => {
+                        const option = document.createElement('option');
+                        option.value = video.aweme_id;
+                        option.textContent = `${video.aweme_id} - ${video.description.substring(0, 30)}...`;
+                        select.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => console.error('加载视频列表失败:', error));
+    }
+
+    // 使用建议卡片
+    function useSuggestion(type) {
+        const suggestions = {
+            'content': '请帮我分析这个视频的内容表现，并给出优化建议。',
+            'trending': '根据当前视频数据，分析一下热门趋势和用户偏好。',
+            'engagement': '如何提高这个视频的互动率？请给出具体的策略建议。',
+            'schedule': '分析发布时间对视频表现的影响，建议最佳的发布时间段。'
+        };
+
+        const videoId = document.getElementById('ai-video-select').value;
+        let message = suggestions[type];
+
+        if (videoId) {
+            message += ` 视频ID: ${videoId}`;
+        } else {
+            message += '（请先选择一个视频以获得更精准的分析）';
+        }
+
+        document.getElementById('chat-input').value = message;
+    }
+
+    // 添加消息到聊天界面
+    function addMessage(role, content) {
+        const chatContainer = document.getElementById('chat-container');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${role}`;
+
+        if (role === 'ai') {
+            // AI消息支持Markdown格式
+            messageDiv.innerHTML = formatMarkdown(content);
+        } else {
+            messageDiv.textContent = content;
+        }
+
+        chatContainer.appendChild(messageDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    // 显示输入指示器
+    function showTypingIndicator() {
+        const chatContainer = document.getElementById('chat-container');
+        const typingDiv = document.createElement('div');
+        typingDiv.id = 'typing-indicator';
+        typingDiv.className = 'chat-message ai';
+        typingDiv.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+        chatContainer.appendChild(typingDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    // 移除输入指示器
+    function removeTypingIndicator() {
+        const typingIndicator = document.getElementById('typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
+    }
+
+    // 发送消息
+    async function sendMessage() {
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+
+        if (!message) {
+            return;
+        }
+
+        // 清空输入框
+        input.value = '';
+
+        // 添加用户消息
+        addMessage('user', message);
+
+        // 显示加载指示器
+        showTypingIndicator();
+
+        try {
+            // 获取当前选择的视频ID（如果有）
+            const videoId = document.getElementById('ai-video-select').value;
+
+            // 构建请求
+            const response = await fetch('/api/ai-chat/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    video_id: videoId
+                })
+            });
+
+            const data = await response.json();
+
+            // 移除加载指示器
+            removeTypingIndicator();
+
+            if (data.success) {
+                addMessage('ai', data.data.response);
+            } else {
+                addMessage('ai', `抱歉，分析失败：${data.error}`);
+            }
+        } catch (error) {
+            console.error('发送消息失败:', error);
+            removeTypingIndicator();
+            addMessage('ai', '抱歉，网络错误，请稍后重试。');
+        }
+    }
+
+    // 分析视频
+    async function analyzeVideo() {
+        const videoId = document.getElementById('ai-video-select').value;
+
+        if (!videoId) {
+            alert('请选择一个视频');
+            return;
+        }
+
+        const resultDiv = document.getElementById('ai-analysis-result');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<div class="loading"><div class="loading-spinner"></div>AI正在深度分析中，请稍候...</div>';
+
+        // 同时在聊天中显示分析请求
+        addMessage('user', `请深度分析视频 ${videoId} 的表现并提供优化建议。`);
+        showTypingIndicator();
+
+        try {
+            const response = await fetch('/api/ai-analyze-video/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    video_id: videoId
+                })
+            });
+
+            const data = await response.json();
+
+            removeTypingIndicator();
+
+            if (data.success) {
+                // 格式化分析结果
+                const analysisText = formatAnalysisResult(data.data);
+
+                // 显示分析结果
+                resultDiv.innerHTML = `
+                    <div class="analysis-result">
+                        <h4>🎯 AI深度分析结果</h4>
+                        <div class="analysis-content">${formatMarkdown(analysisText)}</div>
+                    </div>
+                `;
+
+                // 同时在聊天中显示
+                addMessage('ai', analysisText);
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="analysis-result error">
+                        <h4>❌ 分析失败</h4>
+                        <p>${data.error}</p>
+                    </div>
+                `;
+                addMessage('ai', `分析失败：${data.error}`);
+            }
+        } catch (error) {
+            console.error('分析视频失败:', error);
+            removeTypingIndicator();
+            resultDiv.innerHTML = `
+                <div class="analysis-result error">
+                    <h4>❌ 分析失败</h4>
+                    <p>网络错误，请稍后重试</p>
+                </div>
+            `;
+            addMessage('ai', '分析失败：网络错误，请稍后重试。');
+        }
+    }
+
+    // 格式化分析结果为可读文本
+    function formatAnalysisResult(data) {
+        let result = '';
+
+        if (data.content_positioning) {
+            result += '### 📌 内容定位分析\n\n';
+            if (data.content_positioning.theme) {
+                result += `**主题**: ${data.content_positioning.theme}\n\n`;
+            }
+            if (data.content_positioning.target_audience) {
+                result += `**目标受众**: ${data.content_positioning.target_audience}\n\n`;
+            }
+            if (data.content_positioning.uniqueness) {
+                result += `**独特性**: ${data.content_positioning.uniqueness}\n\n`;
+            }
+        }
+
+        if (data.data_analysis) {
+            result += '### 📊 数据表现分析\n\n';
+            if (data.data_analysis.like_rate_comment) {
+                result += `- 点赞率: ${data.data_analysis.like_rate_comment}\n`;
+            }
+            if (data.data_analysis.comment_rate_comment) {
+                result += `- 评论率: ${data.data_analysis.comment_rate_comment}\n`;
+            }
+            if (data.data_analysis.share_rate_comment) {
+                result += `- 分享率: ${data.data_analysis.share_rate_comment}\n`;
+            }
+            if (data.data_analysis.collect_rate_comment) {
+                result += `- 收藏率: ${data.data_analysis.collect_rate_comment}\n`;
+            }
+            result += '\n';
+
+            if (data.data_analysis.strengths && data.data_analysis.strengths.length > 0) {
+                result += '**优势**:\n';
+                data.data_analysis.strengths.forEach(item => {
+                    result += `- ${item}\n`;
+                });
+                result += '\n';
+            }
+
+            if (data.data_analysis.weaknesses && data.data_analysis.weaknesses.length > 0) {
+                result += '**短板**:\n';
+                data.data_analysis.weaknesses.forEach(item => {
+                    result += `- ${item}\n`;
+                });
+                result += '\n';
+            }
+        }
+
+        if (data.optimization_suggestions) {
+            result += '### 💡 优化建议\n\n';
+
+            if (data.optimization_suggestions.title_suggestions && data.optimization_suggestions.title_suggestions.length > 0) {
+                result += '**标题建议**:\n';
+                data.optimization_suggestions.title_suggestions.forEach(item => {
+                    result += `- ${item}\n`;
+                });
+                result += '\n';
+            }
+
+            if (data.optimization_suggestions.publish_time) {
+                result += `**发布时间**: ${data.optimization_suggestions.publish_time}\n\n`;
+            }
+
+            if (data.optimization_suggestions.content_improvements && data.optimization_suggestions.content_improvements.length > 0) {
+                result += '**内容改进**:\n';
+                data.optimization_suggestions.content_improvements.forEach(item => {
+                    result += `- ${item}\n`;
+                });
+                result += '\n';
+            }
+
+            if (data.optimization_suggestions.interaction_guidance && data.optimization_suggestions.interaction_guidance.length > 0) {
+                result += '**互动引导**:\n';
+                data.optimization_suggestions.interaction_guidance.forEach(item => {
+                    result += `- ${item}\n`;
+                });
+                result += '\n';
+            }
+        }
+
+        if (data.risk_assessment) {
+            result += '### ⚠️ 风险评估\n\n';
+            if (data.risk_assessment.sensitive_content) {
+                result += `- 敏感内容: ${data.risk_assessment.sensitive_content}\n`;
+            }
+            if (data.risk_assessment.copyright_risk) {
+                result += `- 版权风险: ${data.risk_assessment.copyright_risk}\n`;
+            }
+            if (data.risk_assessment.violation_risk) {
+                result += `- 违规风险: ${data.risk_assessment.violation_risk}\n`;
+            }
+            result += '\n';
+        }
+
+        if (data.overall_score !== undefined) {
+            result += `### 📈 综合评分: ${data.overall_score}/100\n\n`;
+        }
+
+        if (data.summary) {
+            result += `### 📝 总结\n${data.summary}\n`;
+        }
+
+        if (data.metrics) {
+            result += '\n### 📉 数据指标\n\n';
+            result += `播放量: ${data.metrics.view_count.toLocaleString()}\n`;
+            result += `点赞数: ${data.metrics.like_count.toLocaleString()}\n`;
+            result += `评论数: ${data.metrics.comment_count.toLocaleString()}\n`;
+            result += `分享数: ${data.metrics.share_count.toLocaleString()}\n`;
+            result += `收藏数: ${data.metrics.collect_count.toLocaleString()}\n`;
+            result += `互动率: ${data.metrics.interaction_rate}%\n`;
+        }
+
+        return result;
+    }
+
+    // 简单的Markdown格式化
+    function formatMarkdown(text) {
+        // 转义HTML
+        text = text.replace(/&/g, '&amp;')
+                   .replace(/</g, '&lt;')
+                   .replace(/>/g, '&gt;');
+
+        // 标题
+        text = text.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+        text = text.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+        text = text.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+        // 粗体
+        text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+        // 斜体
+        text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+        // 列表
+        text = text.replace(/^- (.*$)/gim, '<li>$1</li>');
+        text = text.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+        // 换行
+        text = text.replace(/\n/g, '<br>');
+
+        return text;
+    }
+
+    // 页面加载时初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        loadVideoList();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}粉丝数量分析 - 抖音数据分析系统{% endblock %}
+
+{% block page_title %}粉丝数量分析{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>粉丝数量分析</h2>
+    <p>分析视频发布者的粉丝数量分布和排行</p>
+</div>
+
+<!-- 粉丝区间分布 -->
+<div class="card">
+    <div class="card-title">粉丝数量区间分布</div>
+    <div id="fans-distribution-chart" class="chart-container"></div>
+</div>
+
+<!-- 粉丝排行 TOP 10 -->
+<div class="card">
+    <div class="card-title">粉丝数量排行 TOP 10</div>
+    <div id="fans-rank-chart" class="chart-container"></div>
+</div>
+
+<!-- 详细数据表 -->
+<div class="card">
+    <div class="card-title">用户粉丝详细数据 <span id="fans-count" style="font-size: 14px; font-weight: normal; color: #666;">(0 条)</span></div>
+    <div class="table-container">
+        <table id="fans-table">
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>用户名</th>
+                    <th>粉丝数</th>
+                    <th>区间</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="4" class="loading">加载中...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 分页 -->
+    <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px; color: #666;" id="pagination-info">显示 1-10 条，共 0 条</div>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn btn-primary" onclick="changeFansPage(-1)">上一页</button>
+            <button class="btn btn-primary" onclick="changeFansPage(1)">下一页</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let allUsers = [];
+    let fansCurrentPage = 1;
+    const fansPageSize = 10;
+    // 加载粉丝分布数据
+    async function loadFansDistribution() {
+        try {
+            const response = await fetch('/api/fans-distribution/');
+            const data = await response.json();
+
+            if (data.success) {
+                const distribution = data.data;
+                const categories = Object.keys(distribution);
+                const values = Object.values(distribution);
+
+                // 绘制柱状图
+                const chart = echarts.init(document.getElementById('fans-distribution-chart'));
+                const option = {
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: {
+                            type: 'shadow'
+                        }
+                    },
+                    grid: {
+                        left: '3%',
+                        right: '4%',
+                        bottom: '3%',
+                        containLabel: true
+                    },
+                    xAxis: {
+                        type: 'category',
+                        data: categories,
+                        axisLabel: {
+                            rotate: 0
+                        }
+                    },
+                    yAxis: {
+                        type: 'value'
+                    },
+                    series: [
+                        {
+                            name: '用户数',
+                            type: 'bar',
+                            barWidth: '60%',
+                            data: values,
+                            itemStyle: {
+                                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                    { offset: 0, color: '#667eea' },
+                                    { offset: 1, color: '#764ba2' }
+                                ])
+                            },
+                            label: {
+                                show: true,
+                                position: 'top',
+                                formatter: '{c}'
+                            }
+                        }
+                    ]
+                };
+                chart.setOption(option);
+            }
+        } catch (error) {
+            console.error('加载粉丝分布失败:', error);
+        }
+    }
+
+    // 加载粉丝排行数据
+    async function loadFansRank() {
+        try {
+            const response = await fetch('/api/top-users/?limit=1000');
+            const data = await response.json();
+
+            if (data.success) {
+                allUsers = data.data;
+                const users = allUsers.slice(0, 10); // 排行图只显示TOP10
+                const names = users.map(u => u.user_name);
+                const fans_counts = users.map(u => u.fans_count);
+
+                // 绘制横向柱状图
+                const chart = echarts.init(document.getElementById('fans-rank-chart'));
+                const option = {
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: {
+                            type: 'shadow'
+                        }
+                    },
+                    grid: {
+                        left: '3%',
+                        right: '4%',
+                        bottom: '3%',
+                        containLabel: true
+                    },
+                    xAxis: {
+                        type: 'value'
+                    },
+                    yAxis: {
+                        type: 'category',
+                        data: names.reverse(),
+                        axisLabel: {
+                            interval: 0
+                        }
+                    },
+                    series: [
+                        {
+                            name: '粉丝数',
+                            type: 'bar',
+                            barWidth: '60%',
+                            data: fans_counts.reverse(),
+                            itemStyle: {
+                                color: new echarts.graphic.LinearGradient(1, 0, 0, 0, [
+                                    { offset: 0, color: '#667eea' },
+                                    { offset: 1, color: '#764ba2' }
+                                ])
+                            },
+                            label: {
+                                show: true,
+                                position: 'right',
+                                formatter: function(params) {
+                                    return (params.value / 10000).toFixed(1) + 'w';
+                                }
+                            }
+                        }
+                    ]
+                };
+                chart.setOption(option);
+
+                // 更新详细数据表格（带分页）
+                updateFansTable();
+            }
+        } catch (error) {
+            console.error('加载粉丝排行失败:', error);
+        }
+    }
+
+    // 更新粉丝数据表格
+    function updateFansTable() {
+        const tbody = document.querySelector('#fans-table tbody');
+        tbody.innerHTML = '';
+
+        // 分页计算
+        const total = allUsers.length;
+        const start = (fansCurrentPage - 1) * fansPageSize;
+        const end = Math.min(start + fansPageSize, total);
+        const pageUsers = allUsers.slice(start, end);
+
+        pageUsers.forEach((user) => {
+            const fans_count = user.fans_count;
+            let range = '0-99';
+            if (fans_count >= 100000) range = '100000+';
+            else if (fans_count >= 10000) range = '10000-99999';
+            else if (fans_count >= 1000) range = '1000-9999';
+            else if (fans_count >= 100) range = '100-999';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${start + pageUsers.indexOf(user) + 1}</td>
+                <td>${user.user_name}</td>
+                <td>${user.fans_count.toLocaleString()}</td>
+                <td>${range}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // 更新分页信息
+        document.getElementById('fans-count').textContent = `(${total} 条)`;
+        document.getElementById('pagination-info').textContent = `显示 ${start + 1}-${end} 条，共 ${total} 条`;
+    }
+
+    // 翻页
+    function changeFansPage(direction) {
+        const total = allUsers.length;
+        const maxPage = Math.ceil(total / fansPageSize);
+
+        fansCurrentPage += direction;
+        if (fansCurrentPage < 1) fansCurrentPage = 1;
+        if (fansCurrentPage > maxPage) fansCurrentPage = maxPage;
+
+        updateFansTable();
+    }
+
+    // 初始化
+    loadFansDistribution();
+    loadFansRank();
+
+    // 响应式图表
+    window.addEventListener('resize', function() {
+        const distributionChart = echarts.getInstanceByDom(document.getElementById('fans-distribution-chart'));
+        const rankChart = echarts.getInstanceByDom(document.getElementById('fans-rank-chart'));
+        if (distributionChart) distributionChart.resize();
+        if (rankChart) rankChart.resize();
+    });
+</script>
+{% endblock %}

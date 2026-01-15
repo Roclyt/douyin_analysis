@@ -1,0 +1,414 @@
+{% extends 'base.html' %}
+
+{% block title %}点赞数预测 - 抖音数据分析系统{% endblock %}
+
+{% block page_title %}点赞数预测{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>点赞数预测</h2>
+    <p>基于历史数据预测视频的点赞数表现</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">已分析视频数</div>
+        <div class="stat-value" id="total-videos">-</div>
+        <div class="stat-change">基于数据库数据</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">预测准确率</div>
+        <div class="stat-value" id="accuracy">-</div>
+        <div class="stat-change">基于线性回归模型</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">平均点赞数</div>
+        <div class="stat-value" id="avg-likes">-</div>
+        <div class="stat-change">历史数据统计</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">预测模型</div>
+        <div class="stat-value" style="font-size: 20px;">Linear Regression</div>
+        <div class="stat-change">基于评论数、收藏数、分享数</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">选择视频进行预测</h3>
+    <div style="margin-bottom: 20px;">
+        <select id="video-select" style="width: 300px; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+            <option value="">请选择视频</option>
+        </select>
+        <button class="btn btn-primary" onclick="predictLikes()">预测点赞数</button>
+    </div>
+
+    <div id="prediction-result" style="display: none;">
+        <h4 style="margin-bottom: 16px; color: #333;">预测结果</h4>
+        <div style="padding: 20px; background: #f9fafb; border-radius: 8px; margin-bottom: 16px;">
+            <p style="margin-bottom: 12px;"><strong>视频ID：</strong><span id="pred-video-id"></span></p>
+            <p style="margin-bottom: 12px;"><strong>视频描述：</strong><span id="pred-description"></span></p>
+            <p style="margin-bottom: 12px;"><strong>当前点赞数：</strong><span id="pred-current-likes" style="color: #667eea; font-weight: 600;"></span></p>
+            <p style="margin-bottom: 0;"><strong>总互动数：</strong><span id="pred-interactions" style="color: #10b981; font-weight: 600;"></span></p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">预测模型性能</h3>
+    <div id="model-performance-chart" class="chart-container"></div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">未来7天点赞预测</h3>
+    <div id="prediction-comparison-chart" class="chart-container"></div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">影响因素分析</h3>
+    <div id="factors-analysis-chart" class="chart-container"></div>
+</div>
+
+<div class="card">
+    <h3 class="card-title">使用说明</h3>
+    <div style="color: #666; line-height: 1.8;">
+        <p><strong>1. 模型原理：</strong>本系统使用线性回归模型，基于评论数、收藏数、分享数等特征预测视频的点赞数。</p>
+        <p><strong>2. 特征选择：</strong>模型主要考虑以下因素：</p>
+        <ul style="margin-left: 20px;">
+            <li>评论数 (comment_count)</li>
+            <li>收藏数 (collect_count)</li>
+            <li>分享数 (share_count)</li>
+            <li>粉丝数 (fans_count)</li>
+            <li>视频时长 (duration)</li>
+        </ul>
+        <p><strong>3. 预测流程：</strong>选择视频后，系统会自动从数据库获取该视频的数据，并使用训练好的模型进行预测。</p>
+        <p><strong>4. 注意事项：</strong>预测结果仅供参考，实际点赞数受多种因素影响，如发布时间、内容质量等。</p>
+    </div>
+</div>
+
+<script>
+    let performanceChart = null;
+    let comparisonChart = null;
+    let factorsChart = null;
+
+    // 加载统计数据
+    function loadStats() {
+        fetch('/api/prediction-stats/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('total-videos').textContent = data.data.total_videos;
+                    document.getElementById('accuracy').textContent = data.data.accuracy;
+                    document.getElementById('avg-likes').textContent = data.data.avg_likes;
+                }
+            })
+            .catch(error => console.error('加载统计数据失败:', error));
+    }
+
+    // 加载视频列表
+    function loadVideoList() {
+        fetch('/api/video-list/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const select = document.getElementById('video-select');
+                    select.innerHTML = '<option value="">请选择视频</option>';
+                    data.data.videos.forEach(video => {
+                        const option = document.createElement('option');
+                        option.value = video.aweme_id;
+                        option.textContent = `${video.aweme_id} - ${video.description.substring(0, 30)}...`;
+                        select.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => console.error('加载视频列表失败:', error));
+    }
+
+    // 预测点赞数
+    function predictLikes() {
+        const videoId = document.getElementById('video-select').value;
+        if (!videoId) {
+            alert('请选择一个视频');
+            return;
+        }
+
+        const resultDiv = document.getElementById('prediction-result');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<div class="loading"><div class="loading-spinner"></div>预测中...</div>';
+
+        fetch('/api/predict-likes/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ video_id: videoId })
+        })
+        .then(response => {
+            console.log('响应状态:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('响应数据:', data);
+            if (data.success) {
+                resultDiv.innerHTML = `
+                    <h4 style="margin-bottom: 16px; color: #333;">预测结果</h4>
+                    <div style="padding: 20px; background: #f9fafb; border-radius: 8px; margin-bottom: 16px;">
+                        <p style="margin-bottom: 12px;"><strong>视频ID：</strong><span>${data.data.video_id}</span></p>
+                        <p style="margin-bottom: 12px;"><strong>视频描述：</strong><span>${data.data.description}</span></p>
+                        <p style="margin-bottom: 12px;"><strong>当前点赞数：</strong><span style="color: #667eea; font-weight: 600;">${data.data.current_likes}</span></p>
+                        <p style="margin-bottom: 0;"><strong>总互动数：</strong><span style="color: #10b981; font-weight: 600;">${data.data.total_interactions}</span></p>
+                    </div>
+                `;
+
+                // 更新未来7天预测图表
+                updateFuturePredictionChart(data.data.future_dates, data.data.future_predictions);
+            } else {
+                resultDiv.innerHTML = `<p style="color: #dc2626;">预测失败: ${data.error}</p>`;
+            }
+        })
+        .catch(error => {
+            console.error('预测失败:', error);
+            resultDiv.innerHTML = `<p style="color: #dc2626;">预测失败: ${error.message}</p>`;
+        });
+    }
+
+    // 初始化模型性能图表
+    function initPerformanceChart() {
+        fetch('/api/prediction-performance/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    performanceChart = echarts.init(document.getElementById('model-performance-chart'));
+                    const option = {
+                        title: {
+                            text: '模型预测准确率',
+                            left: 'center'
+                        },
+                        tooltip: {
+                            trigger: 'axis'
+                        },
+                        xAxis: {
+                            type: 'category',
+                            data: ['训练集', '测试集']
+                        },
+                        yAxis: {
+                            type: 'value',
+                            name: '准确率',
+                            max: 100
+                        },
+                        series: [{
+                            data: [
+                                { value: data.data.train_accuracy, itemStyle: { color: '#667eea' } },
+                                { value: data.data.test_accuracy, itemStyle: { color: '#764ba2' } }
+                            ],
+                            type: 'bar',
+                            barWidth: '60%',
+                            label: {
+                                show: true,
+                                position: 'top',
+                                formatter: '{c}%'
+                            }
+                        }]
+                    };
+                    performanceChart.setOption(option);
+                }
+            })
+            .catch(error => console.error('加载模型性能数据失败:', error));
+    }
+
+    // 初始化对比图表 - 改为未来7天预测图表
+    function initComparisonChart() {
+        comparisonChart = echarts.init(document.getElementById('prediction-comparison-chart'));
+        const option = {
+            title: {
+                text: '请选择视频进行预测',
+                left: 'center',
+                textStyle: {
+                    color: '#666'
+                }
+            },
+            tooltip: {
+                trigger: 'axis'
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'category',
+                boundaryGap: false,
+                data: []
+            },
+            yAxis: {
+                type: 'value',
+                name: '点赞数'
+            },
+            series: []
+        };
+        comparisonChart.setOption(option);
+    }
+
+    // 更新未来7天预测图表
+    function updateFuturePredictionChart(dates, predictions) {
+        try {
+            if (!comparisonChart) {
+                comparisonChart = echarts.init(document.getElementById('prediction-comparison-chart'));
+            }
+
+            // 销毁旧实例，重新创建
+            if (comparisonChart) {
+                comparisonChart.dispose();
+            }
+
+            comparisonChart = echarts.init(document.getElementById('prediction-comparison-chart'));
+
+            const option = {
+                title: {
+                    text: '未来7天点赞预测',
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        const date = params[0].name;
+                        const value = params[0].value;
+                        return `日期: ${date}<br/>预测点赞: ${value}`;
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: dates,
+                    name: '日期'
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '点赞数'
+                },
+                series: [{
+                    name: '预测点赞数',
+                    type: 'line',
+                    data: predictions,
+                    smooth: true,
+                    symbol: 'circle',
+                    symbolSize: 8,
+                    lineStyle: {
+                        width: 3,
+                        color: {
+                            type: 'linear',
+                            x: 0,
+                            y: 0,
+                            x2: 1,
+                            y2: 0,
+                            colorStops: [{
+                                offset: 0,
+                                color: '#667eea'
+                            }, {
+                                offset: 1,
+                                color: '#764ba2'
+                            }]
+                        }
+                    },
+                    itemStyle: {
+                        color: '#667eea'
+                    },
+                    areaStyle: {
+                        color: {
+                            type: 'linear',
+                            x: 0,
+                            y: 0,
+                            x2: 0,
+                            y2: 1,
+                            colorStops: [{
+                                offset: 0,
+                                color: 'rgba(102, 126, 234, 0.3)'
+                            }, {
+                                offset: 1,
+                                color: 'rgba(102, 126, 234, 0.05)'
+                            }]
+                        }
+                    },
+                    label: {
+                        show: true,
+                        position: 'top',
+                        formatter: '{c}'
+                    }
+                }]
+            };
+            comparisonChart.setOption(option);
+            console.log('图表更新成功');
+        } catch (error) {
+            console.error('更新图表失败:', error);
+        }
+    }
+
+    // 初始化影响因素图表
+    function initFactorsChart() {
+        factorsChart = echarts.init(document.getElementById('factors-analysis-chart'));
+        const option = {
+            title: {
+                text: '特征重要性分析',
+                left: 'center'
+            },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'shadow'
+                }
+            },
+            xAxis: {
+                type: 'value',
+                name: '重要性系数'
+            },
+            yAxis: {
+                type: 'category',
+                data: ['评论数', '收藏数', '分享数', '粉丝数', '视频时长']
+            },
+            series: [{
+                type: 'bar',
+                data: [
+                    { value: 0.45, itemStyle: { color: '#667eea' } },
+                    { value: 0.30, itemStyle: { color: '#764ba2' } },
+                    { value: 0.15, itemStyle: { color: '#f59e0b' } },
+                    { value: 0.07, itemStyle: { color: '#10b981' } },
+                    { value: 0.03, itemStyle: { color: '#3b82f6' } }
+                ],
+                label: {
+                    show: true,
+                    position: 'right'
+                }
+            }]
+        };
+        factorsChart.setOption(option);
+    }
+
+    // 窗口大小改变时重绘图表
+    window.addEventListener('resize', function() {
+        if (performanceChart) performanceChart.resize();
+        if (comparisonChart) comparisonChart.resize();
+        if (factorsChart) factorsChart.resize();
+    });
+
+    // 页面加载时初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        loadStats();
+        loadVideoList();
+        initPerformanceChart();
+        initComparisonChart();
+        initFactorsChart();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}视频评论查看 - 抖音数据分析系统{% endblock %}
+
+{% block page_title %}视频评论查看{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>视频评论数据</h2>
+    <p>查看所有视频及其对应的评论信息</p>
+</div>
+
+<!-- 筛选区域 -->
+<div class="card">
+    <div class="card-title">筛选条件</div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+        <label>选择视频：</label>
+        <select id="video-select" style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px; min-width: 300px;">
+            <option value="">全部视频</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadComments()">查询</button>
+        <button class="btn btn-primary" onclick="loadAllComments()">显示全部</button>
+    </div>
+</div>
+
+<!-- 视频信息 -->
+<div class="card" id="video-info-card" style="display: none;">
+    <div class="card-title">视频信息</div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+        <div>
+            <div style="font-size: 14px; color: #666;">视频ID</div>
+            <div style="font-size: 16px; font-weight: 600; color: #333;" id="video-id">-</div>
+        </div>
+        <div>
+            <div style="font-size: 14px; color: #666;">用户名</div>
+            <div style="font-size: 16px; font-weight: 600; color: #333;" id="video-user">-</div>
+        </div>
+        <div>
+            <div style="font-size: 14px; color: #666;">粉丝数</div>
+            <div style="font-size: 16px; font-weight: 600; color: #667eea;" id="video-fans">-</div>
+        </div>
+        <div>
+            <div style="font-size: 14px; color: #666;">点赞数</div>
+            <div style="font-size: 16px; font-weight: 600; color: #667eea;" id="video-likes">-</div>
+        </div>
+        <div>
+            <div style="font-size: 14px; color: #666;">评论数</div>
+            <div style="font-size: 16px; font-weight: 600; color: #667eea;" id="video-comments">-</div>
+        </div>
+        <div>
+            <div style="font-size: 14px; color: #666;">收藏数</div>
+            <div style="font-size: 16px; font-weight: 600; color: #667eea;" id="video-collects">-</div>
+        </div>
+    </div>
+</div>
+
+<!-- 评论列表 -->
+<div class="card">
+    <div class="card-title">评论列表 <span id="comment-count" style="font-size: 14px; font-weight: normal; color: #666;">(0 条)</span></div>
+    <div class="table-container">
+        <table id="comments-table">
+            <thead>
+                <tr>
+                    <th>用户</th>
+                    <th>评论内容</th>
+                    <th>点赞数</th>
+                    <th>用户IP</th>
+                    <th>评论时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="5" class="loading">加载中...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 分页 -->
+    <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px; color: #666;" id="pagination-info">显示 1-20 条，共 0 条</div>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn btn-primary" onclick="loadComments(null, -1)">上一页</button>
+            <button class="btn btn-primary" onclick="loadComments(null, 1)">下一页</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentPage = 1;
+    const pageSize = 20;
+    let selectedVideoId = '';
+    let allComments = [];
+
+    // 加载视频列表
+    async function loadVideoList() {
+        try {
+            const response = await fetch('/api/video-list/?limit=100');
+            const data = await response.json();
+
+            if (data.success) {
+                const select = document.getElementById('video-select');
+                // 修复：api_video_list返回的是data.data.videos，而不是data.data
+                (data.data.videos || []).forEach(video => {
+                    const option = document.createElement('option');
+                    option.value = video.aweme_id;
+                    option.textContent = `${video.user_name} - ${video.description.substring(0, 30)}...`;
+                    select.appendChild(option);
+                });
+
+                // 添加change事件监听器
+                select.addEventListener('change', function() {
+                    const videoId = this.value;
+                    loadComments(videoId);
+                });
+            }
+        } catch (error) {
+            console.error('加载视频列表失败:', error);
+        }
+    }
+
+    // 加载评论
+    async function loadComments(videoId = null, direction = 0) {
+        if (videoId !== null) {
+            selectedVideoId = videoId;
+            currentPage = 1;
+        }
+
+        if (direction !== 0) {
+            currentPage += direction;
+            if (currentPage < 1) currentPage = 1;
+        }
+
+        try {
+            const response = await fetch(`/api/video-comments/?video_id=${selectedVideoId}&page=${currentPage}&limit=${pageSize}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const tbody = document.querySelector('#comments-table tbody');
+                tbody.innerHTML = '';
+
+                if (data.data.comments && data.data.comments.length > 0) {
+                    data.data.comments.forEach(comment => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${comment.user_name}</td>
+                            <td>${comment.content}</td>
+                            <td>${comment.like_count}</td>
+                            <td>${comment.user_ip}</td>
+                            <td>${comment.comment_time}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    document.getElementById('comment-count').textContent = `(${data.data.total} 条)`;
+                    const start = (currentPage - 1) * pageSize + 1;
+                    const end = Math.min(start + pageSize - 1, data.data.total);
+                    document.getElementById('pagination-info').textContent = `显示 ${start}-${end} 条，共 ${data.data.total} 条`;
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;">暂无评论数据</td></tr>';
+                }
+
+                // 加载视频信息
+                if (selectedVideoId) {
+                    loadVideoInfo(selectedVideoId);
+                }
+            }
+        } catch (error) {
+            console.error('加载评论失败:', error);
+        }
+    }
+
+    // 加载视频信息
+    async function loadVideoInfo(videoId) {
+        try {
+            const response = await fetch('/api/video-list/?limit=100');
+            const data = await response.json();
+
+            if (data.success) {
+                // 修复：api_video_list返回的是data.data.videos，而不是data.data
+                const video = (data.data.videos || []).find(v => v.aweme_id === videoId);
+                if (video) {
+                    document.getElementById('video-info-card').style.display = 'block';
+                    document.getElementById('video-id').textContent = video.aweme_id;
+                    document.getElementById('video-user').textContent = video.user_name;
+                    document.getElementById('video-fans').textContent = video.fans_count?.toLocaleString() || '0';
+                    document.getElementById('video-likes').textContent = video.like_count?.toLocaleString() || '0';
+                    document.getElementById('video-comments').textContent = video.comment_count?.toLocaleString() || '0';
+                    document.getElementById('video-collects').textContent = video.collect_count?.toLocaleString() || '0';
+                }
+            }
+        } catch (error) {
+            console.error('加载视频信息失败:', error);
+        }
+    }
+
+    // 加载全部评论
+    async function loadAllComments() {
+        selectedVideoId = '';
+        document.getElementById('video-select').value = '';
+        document.getElementById('video-info-card').style.display = 'none';
+        loadComments('');
+    }
+
+    // 初始化
+    loadVideoList();
+    loadAllComments();
+</script>
+{% endblock %}

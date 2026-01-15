@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}情感分析 - 抖音数据分析系统{% endblock %}
+
+{% block page_title %}情感分析{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>评论情感分析</h2>
+    <p>基于SnowNLP分析评论的情感倾向（正面/负面/中性）</p>
+</div>
+
+<!-- 统计卡片 -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">已分析评论</div>
+        <div class="stat-value" id="analyzed-count">-</div>
+        <div class="stat-change">进行情感分析的评论数</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">正面评论</div>
+        <div class="stat-value" id="positive-count" style="color: #10b981;">-</div>
+        <div class="stat-change" id="positive-ratio">占比 0%</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">中性评论</div>
+        <div class="stat-value" id="neutral-count" style="color: #6b7280;">-</div>
+        <div class="stat-change" id="neutral-ratio">占比 0%</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">负面评论</div>
+        <div class="stat-value" id="negative-count" style="color: #ef4444;">-</div>
+        <div class="stat-change" id="negative-ratio">占比 0%</div>
+    </div>
+</div>
+
+<!-- 分析按钮和筛选 -->
+<div class="card">
+    <div class="card-title">操作</div>
+    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <label>选择视频：</label>
+        <select id="video-select" style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px; min-width: 300px;">
+            <option value="">全部视频</option>
+        </select>
+        <button class="btn btn-primary" onclick="analyzeSentiment()">开始情感分析</button>
+        <span id="analysis-status" style="font-size: 14px; color: #666;"></span>
+    </div>
+</div>
+
+<!-- 情感分布图 -->
+<div class="card">
+    <div class="card-title">情感分布</div>
+    <div id="sentiment-chart" class="chart-container"></div>
+</div>
+
+<!-- 评论情感列表 -->
+<div class="card">
+    <div class="card-title">评论情感分析结果</div>
+    <div class="table-container">
+        <table id="sentiment-table">
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>评论内容</th>
+                    <th>情感</th>
+                    <th>得分</th>
+                    <th>用户</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 40px;">
+                        <button class="btn btn-primary" onclick="analyzeSentiment()">点击开始分析</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 情感分析
+    async function analyzeSentiment() {
+        const statusEl = document.getElementById('analysis-status');
+        const videoId = document.getElementById('video-select').value;
+        statusEl.textContent = '分析中...';
+
+        try {
+            const url = videoId ? `/api/analyze-sentiment/?video_id=${videoId}` : '/api/analyze-sentiment/';
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                statusEl.textContent = '分析完成！';
+                displayResults(data.data);
+            } else {
+                statusEl.textContent = '分析失败: ' + data.error;
+            }
+        } catch (error) {
+            console.error('情感分析失败:', error);
+            statusEl.textContent = '分析失败';
+        }
+    }
+
+    // 加载视频列表
+    async function loadVideoList() {
+        try {
+            const response = await fetch('/api/video-list/?limit=100');
+            const data = await response.json();
+
+            if (data.success) {
+                const select = document.getElementById('video-select');
+                (data.data.videos || []).forEach(video => {
+                    const option = document.createElement('option');
+                    option.value = video.aweme_id;
+                    option.textContent = `${video.user_name} - ${video.description.substring(0, 30)}...`;
+                    select.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('加载视频列表失败:', error);
+        }
+    }
+
+    // 显示结果
+    function displayResults(data) {
+        // 更新统计卡片
+        document.getElementById('analyzed-count').textContent = data.total;
+        document.getElementById('positive-count').textContent = data.positive;
+        document.getElementById('neutral-count').textContent = data.neutral;
+        document.getElementById('negative-count').textContent = data.negative;
+
+        const positiveRatio = ((data.positive / data.total) * 100).toFixed(1);
+        const neutralRatio = ((data.neutral / data.total) * 100).toFixed(1);
+        const negativeRatio = ((data.negative / data.total) * 100).toFixed(1);
+
+        document.getElementById('positive-ratio').textContent = `占比 ${positiveRatio}%`;
+        document.getElementById('neutral-ratio').textContent = `占比 ${neutralRatio}%`;
+        document.getElementById('negative-ratio').textContent = `占比 ${negativeRatio}%`;
+
+        // 绘制饼图
+        const chart = echarts.init(document.getElementById('sentiment-chart'));
+        const option = {
+            tooltip: {
+                trigger: 'item',
+                formatter: '{b}: {c} 条 ({d}%)'
+            },
+            legend: {
+                orient: 'vertical',
+                left: 'left',
+                top: 'middle'
+            },
+            series: [
+                {
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    avoidLabelOverlap: false,
+                    itemStyle: {
+                        borderRadius: 10,
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    },
+                    label: {
+                        show: false,
+                        position: 'center'
+                    },
+                    emphasis: {
+                        label: {
+                            show: true,
+                            fontSize: 20,
+                            fontWeight: 'bold'
+                        }
+                    },
+                    labelLine: {
+                        show: false
+                    },
+                    data: [
+                        { value: data.positive, name: '正面', itemStyle: { color: '#10b981' } },
+                        { value: data.neutral, name: '中性', itemStyle: { color: '#6b7280' } },
+                        { value: data.negative, name: '负面', itemStyle: { color: '#ef4444' } }
+                    ]
+                }
+            ]
+        };
+        chart.setOption(option);
+
+        // 更新表格
+        if (data.comments && data.comments.length > 0) {
+            const tbody = document.querySelector('#sentiment-table tbody');
+            tbody.innerHTML = '';
+
+            data.comments.forEach((comment, index) => {
+                let sentiment = '中性';
+                let sentimentColor = '#6b7280';
+                if (comment.sentiment > 0.6) {
+                    sentiment = '正面';
+                    sentimentColor = '#10b981';
+                } else if (comment.sentiment < 0.4) {
+                    sentiment = '负面';
+                    sentimentColor = '#ef4444';
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${comment.content}</td>
+                    <td style="color: ${sentimentColor}; font-weight: 600;">${sentiment}</td>
+                    <td>${comment.sentiment.toFixed(2)}</td>
+                    <td>${comment.user_name}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    }
+
+    // 获取CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // 响应式图表
+    window.addEventListener('resize', function() {
+        const chart = echarts.getInstanceByDom(document.getElementById('sentiment-chart'));
+        if (chart) chart.resize();
+    });
+
+    // 初始化
+    loadVideoList();
+</script>
+{% endblock %}

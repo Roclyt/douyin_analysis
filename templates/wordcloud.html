@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>词云分析 - 抖音数据分析系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f7fa;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 40px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+        }
+
+        .header a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .header a:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .control-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .control-bar label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .control-bar select,
+        .control-bar input {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-right: 15px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 10px 25px;
+            font-size: 14px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #667eea;
+            color: white;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-card h3 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 500px;
+        }
+
+        .wordcloud-image {
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+        }
+
+        .top-words {
+            margin-top: 20px;
+        }
+
+        .top-words table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .top-words th,
+        .top-words td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .top-words th {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>词云分析</h1>
+        <a href="/">返回首页</a>
+    </div>
+
+    <div class="container">
+        <div class="control-bar">
+            <label for="videoSelect">选择视频：</label>
+            <select id="videoSelect">
+                <option value="">所有视频</option>
+            </select>
+            <button class="btn" onclick="generateWordclouds()">生成词云</button>
+        </div>
+
+        <div id="loading" class="loading">
+            <p>加载中...</p>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>视频描述词云</h3>
+                <div id="videoWordcloud" class="chart-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <h3>评论内容词云</h3>
+                <div id="commentWordcloud" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时加载视频列表
+        window.onload = function() {
+            loadVideoList();
+            generateWordclouds();
+        };
+
+        // 加载视频列表
+        function loadVideoList() {
+            fetch('/api/video-list/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data.videos) {
+                        const select = document.getElementById('videoSelect');
+                        data.data.videos.forEach(video => {
+                            const option = document.createElement('option');
+                            option.value = video.aweme_id;
+                            option.textContent = video.user_name + ' - ' + video.title;
+                            select.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // 显示加载状态
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('message').style.display = 'none';
+        }
+
+        // 隐藏加载状态
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+
+        // 显示消息
+        function showMessage(message, isError = false) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = 'message ' + (isError ? 'error' : 'success');
+            messageDiv.style.display = 'block';
+
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // 生成词云
+        function generateWordclouds() {
+            const videoId = document.getElementById('videoSelect').value;
+            showLoading();
+
+            Promise.all([
+                loadVideoWordcloud(videoId),
+                loadCommentWordcloud(videoId)
+            ]).then(() => {
+                hideLoading();
+            }).catch(error => {
+                hideLoading();
+                showMessage('加载失败：' + error, true);
+            });
+        }
+
+        // 加载视频词云
+        function loadVideoWordcloud(videoId) {
+            let url = '/api/video-wordcloud/';
+            if (videoId) {
+                url += '?video_id=' + encodeURIComponent(videoId);
+            }
+
+            return fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data.image) {
+                        const container = document.getElementById('videoWordcloud');
+                        container.innerHTML = `<img src="${data.data.image}" class="wordcloud-image" alt="视频词云">`;
+
+                        // 显示词频统计
+                        if (data.data.top_words) {
+                            const html = '<div class="top-words"><h4>高频词汇</h4><table><thead><tr><th>词汇</th><th>出现次数</th></tr></thead><tbody>';
+                            data.data.top_words.slice(0, 15).forEach(([word, count]) => {
+                                html += `<tr><td>${word}</td><td>${count}</td></tr>`;
+                            });
+                            html += '</tbody></table></div>';
+                            container.innerHTML += html;
+                        }
+                    }
+                });
+        }
+
+        // 加载评论词云
+        function loadCommentWordcloud(videoId) {
+            let url = '/api/comment-wordcloud/';
+            if (videoId) {
+                url += '?video_id=' + encodeURIComponent(videoId);
+            }
+
+            return fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data.image) {
+                        const container = document.getElementById('commentWordcloud');
+                        container.innerHTML = `<img src="${data.data.image}" class="wordcloud-image" alt="评论词云">`;
+
+                        // 显示词频统计
+                        if (data.data.top_words) {
+                            let html = '<div class="top-words"><h4>高频词汇</h4><table><thead><tr><th>词汇</th><th>出现次数</th></tr></thead><tbody>';
+                            data.data.top_words.slice(0, 15).forEach(([word, count]) => {
+                                html += `<tr><td>${word}</td><td>${count}</td></tr>`;
+                            });
+                            html += '</tbody></table></div>';
+                            container.innerHTML += html;
+                        }
+                    }
+                });
+        }
+    </script>
+</body>
+</html>

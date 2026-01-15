@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}用户地区分析 - 抖音数据分析系统{% endblock %}
+
+{% block page_title %}用户地区分析{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>用户地区分布</h2>
+    <p>分析评论用户的地区分布情况</p>
+</div>
+
+<!-- 统计摘要 -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">涉及地区数</div>
+        <div class="stat-value" id="total-regions">-</div>
+        <div class="stat-change">用户分布地区</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">最活跃地区</div>
+        <div class="stat-value" id="top-region">-</div>
+        <div class="stat-change" id="top-region-count">评论数最多</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">平均每地区评论</div>
+        <div class="stat-value" id="avg-per-region">-</div>
+        <div class="stat-change">地区平均活跃度</div>
+    </div>
+</div>
+
+<!-- 地区分布图 -->
+<div class="card">
+    <div class="card-title">用户地区分布（TOP 10）</div>
+    <div id="region-chart" class="chart-container"></div>
+</div>
+
+<!-- 详细数据表 -->
+<div class="card">
+    <div class="card-title">地区详细数据</div>
+    <div class="table-container">
+        <table id="region-table">
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>地区</th>
+                    <th>评论数</th>
+                    <th>占比</th>
+                    <th>占比图</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="5" class="loading">加载中...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 加载地区分布数据
+    async function loadRegionData() {
+        try {
+            const response = await fetch('/api/ip-distribution/');
+            const data = await response.json();
+
+            if (data.success) {
+                const regions = data.data;
+                const regionNames = Object.keys(regions);
+                const regionCounts = Object.values(regions);
+                const totalComments = regionCounts.reduce((a, b) => a + b, 0);
+
+                // 更新统计卡片
+                document.getElementById('total-regions').textContent = regionNames.length;
+
+                const sortedRegions = Object.entries(regions).sort((a, b) => b[1] - a[1]);
+                if (sortedRegions.length > 0) {
+                    document.getElementById('top-region').textContent = sortedRegions[0][0];
+                    document.getElementById('top-region-count').textContent = `${sortedRegions[0][1]} 条评论`;
+                }
+
+                const avgPerRegion = Math.round(totalComments / regionNames.length);
+                document.getElementById('avg-per-region').textContent = avgPerRegion.toLocaleString();
+
+                // 绘制饼图
+                const chart = echarts.init(document.getElementById('region-chart'));
+                const pieData = sortedRegions.map(([name, count]) => ({
+                    value: count,
+                    name: name
+                }));
+
+                const option = {
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: '{b}: {c} 条 ({d}%)'
+                    },
+                    legend: {
+                        orient: 'vertical',
+                        left: 'left',
+                        top: 'middle'
+                    },
+                    series: [
+                        {
+                            type: 'pie',
+                            radius: ['40%', '70%'],
+                            avoidLabelOverlap: false,
+                            itemStyle: {
+                                borderRadius: 10,
+                                borderColor: '#fff',
+                                borderWidth: 2
+                            },
+                            label: {
+                                show: false,
+                                position: 'center'
+                            },
+                            emphasis: {
+                                label: {
+                                    show: true,
+                                    fontSize: 20,
+                                    fontWeight: 'bold'
+                                }
+                            },
+                            labelLine: {
+                                show: false
+                            },
+                            data: pieData.slice(0, 10)
+                        }
+                    ]
+                };
+                chart.setOption(option);
+
+                // 更新表格
+                const tbody = document.querySelector('#region-table tbody');
+                tbody.innerHTML = '';
+
+                sortedRegions.forEach(([region, count], index) => {
+                    const percentage = ((count / totalComments) * 100).toFixed(2);
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${region}</td>
+                        <td>${count.toLocaleString()}</td>
+                        <td>${percentage}%</td>
+                        <td>
+                            <div style="width: 200px; height: 20px; background: #e5e7eb; border-radius: 10px; overflow: hidden;">
+                                <div style="width: ${percentage}%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2);"></div>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        } catch (error) {
+            console.error('加载地区数据失败:', error);
+        }
+    }
+
+    // 初始化
+    loadRegionData();
+
+    // 响应式图表
+    window.addEventListener('resize', function() {
+        const chart = echarts.getInstanceByDom(document.getElementById('region-chart'));
+        if (chart) chart.resize();
+    });
+</script>
+{% endblock %}
